@@ -16,7 +16,7 @@
 
 
         <provider
-            android:authorities="trindade.daniel.galeria.fileprovider"
+            android:authorities="isabel.vitoria.galeria.fileprovider"
             android:name="androidx.core.content.FileProvider"
             android:exported="false"
             android:grantUriPermissions="true">

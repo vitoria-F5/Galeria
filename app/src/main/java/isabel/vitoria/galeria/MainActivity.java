@@ -3,11 +3,17 @@ package isabel.vitoria.galeria;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
-import androidx.constraintlayout.core.motion.utils.Utils;
+import androidx.core.content.FileProvider;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -15,10 +21,62 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.Toast;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
+
+    List<String> photos;
+    MainActivity mainActivity;
+    static int RESULT_TAME_PITURE = 1;
+    String currentPhotoPath;
+    static int RESULT_REQUEST_PERMISSION = 2;
+
+
+    private void dispatchTakePictureIntent() {
+        File f = null;
+        try {
+            f = createImageFile();
+        } catch (IOException e) {
+            Toast.makeText(MainActivity.this, "Não foi possível criar o arquivo", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        currentPhotoPath = f.getAbsolutePath();
+
+        if(f != null) {
+            Uri fUri = FileProvider.getUriForFile(MainActivity.this, "isabel.vitoria.galeria.fileprovider", f);
+            Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            i.putExtra(MediaStore.EXTRA_OUTPUT, fUri);
+            startActivityForResult(i, RESULT_TAKE_PICTURE);
+        }
+    }
+
+    private File createImageFile() throws IOException {
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String imageFileName = "JPEG_" + timeStamp;
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File f = File.createTempFile(imageFileName, ".jpg", storageDir);
+        return f;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if(requestCode == RESULT_TAKE_PICTURE) {
+            if(resultCode == Activity.RESULT_OK) {
+                photos.add(currentPhotoPath);
+                mainAdapter.notifyItemInserted(photos.size()-1);
+            }
+            else {
+                File f = new File(currentPhotoPath);
+                f.delete();
+            }
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,6 +86,21 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = findViewById(R.id.tbMain);
         setSupportActionBar(toolbar);
 
+        File dir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File[] files = dir.listFiles();
+        for(int i = 0; i < files.length; i++) {
+            photos.add(files[i].getAbsolutePath());
+        }
+
+        MainAdapter mainAdapter = new MainAdapter(MainActivity.this, photos);
+
+        RecyclerView rvGallery = findViewById(R.id.rvGallery);
+        rvGallery.setAdapter(mainAdapter);
+
+        float w = getResources().getDimension(R.dimen.itemWidth);
+        int numberOfColumns = Utils.calculateNoOfColumns(MainActivity.this, w);
+        GridLayoutManager gridLayoutManager = new GridLayoutManager(MainActivity.this, numberOfColumns);
+        rvGallery.setLayoutManager(gridLayoutManager);
     }
 
     @Override
@@ -47,50 +120,14 @@ public class MainActivity extends AppCompatActivity {
             default:
                 return super.onOptionsItemSelected(item);
         }
-
     }
 
     private void dispatchTakePictureIntent() {
     }
 
-    public class MainAdapter extends RecyclerView.Adapter {
-
-        MainActivity mainActivity;
-        List<String> photos;
-
-        public MainAdapter(MainActivity mainActivity, List<String> photos) {
-            this.mainActivity = mainActivity;
-            this.photos = photos;
-        }
-
-        @NonNull
-        @Override
-        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            LayoutInflater inflater = LayoutInflater.from(mainActivity);
-            View v = inflater.inflate(R.layout.list_item, parent, false);
-            return new MeuViewHolder(v);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, final int position) {
-            ImageView imPhoto = holder.itemView.findViewById(R.id.imItem);
-            int w = (int) mainActivity.getResources().getDimension(R.dimen.itemWidth);
-            int h = (int) mainActivity.getResources().getDimension(R.dimen.itemHeight);
-            Bitmap bitmap = Utils.getBitmap(photos.get(position), w, h);
-            imPhoto.setImageBitmap(bitmap);
-            imPhoto.setOnClickListener(new View.OnClickListener() {
-
-
-                @Override
-                    public void onClick(View v) {
-                    mainActivity.startPhotoActivity(photos.get(position));
-                }
-            });
-        }
-
-        @Override
-        public int getItemCount() {
-            return this.photos.size();
-        }
+    public void startPhotoActivity(String photoPath) {
+        Intent i = new Intent(MainActivity.this, PhotoActivity.class);
+        i.putExtra("photo_path", photoPath);
+        startActivity(i);
     }
 }
